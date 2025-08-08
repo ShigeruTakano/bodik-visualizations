@@ -1,5 +1,28 @@
-xt-white">HTML時計ジェネレーター</h1>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML時計ジェネレーター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+        .control-label {
+            @apply block text-sm font-medium text-gray-700 dark:text-gray-300;
+        }
+        .color-select {
+            @apply w-1/2 p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
 
+    <div class="flex flex-col lg:flex-row h-screen">
+        <!-- ===== コントロールパネル ===== -->
+        <aside class="w-full lg:w-1/3 xl:w-1/4 p-6 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+            <h1 class="text-2xl font-bold mb-6 text-gray-900 dark:text-white">HTML時計ジェネレーター</h1>
 <div class="space-y-6">
   <!-- 表示要素 -->
   <div>
