@@ -1,0 +1,602 @@
+r text-center transition-all duration-300;
+}
+.data-card-value {
+@apply text-2xl md:text-3xl font-bold text-gray-800;
+}
+.data-card-label {
+@apply text-sm text-gray-500 mt-1;
+}
+</style>
+</head>
+<body class="bg-gray-100 bg-gradient-to-br from-blue-100 to-cyan-100 min-h-screen flex items-center justify-center p-4">
+
+  <div class="w-full max-w-4xl mx-auto bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-6 md:p-8">
+
+    <!-- ヘッダー -->
+    <header id="main-header" class="text-center mb-6">
+      <h1 class="text-3xl font-bold text-gray-800">アメダス気象データ</h1>
+      <p class="text-gray-500 mt-2">気象庁の最新データを表示します</p>
+    </header>
+
+    <!-- コントロール部分 -->
+    <div id="controls-container" class="flex flex-col md:flex-row gap-4 mb-6">
+      <div class="flex-grow">
+	<label for="station-select" class="block mb-2 text-sm font-medium text-gray-700">観測地点を選択してください</label>
+	<select id="station-select" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+	  <option selected>読み込み中...</option>
+	</select>
+      </div>
+      <div class="flex-shrink-0">
+	<label class="block mb-2 text-sm font-medium text-gray-700 opacity-0 hidden md:block">更新</label>
+	<button id="refresh-button" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center">
+	  <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i>
+	  <span>手動更新</span>
+	</button>
+      </div>
+    </div>
+
+    <!-- データ表示エリア -->
+    <div id="data-container" class="text-center">
+      <div id="loading" class="my-8">
+	<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+	<p class="mt-4 text-gray-600">データを読み込んでいます...</p>
+      </div>
+      <div id="error" class="hidden my-8 p-4 bg-red-100 text-red-700 rounded-lg">
+	<p id="error-message"></p>
+      </div>
+      <div id="data-display" class="hidden">
+	<div class="mb-4 text-center">
+	  <h2 id="station-name" class="text-2xl font-bold text-gray-800"></h2>
+	  <p id="observation-time" class="text-gray-500"></p>
+	</div>
+	<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+	  <!-- Data cards will be here -->
+	  <div id="temp-card" class="data-card"> <i data-lucide="thermometer" class="w-8 h-8 text-red-500"></i> <p id="temp" class="data-card-value"></p> <p class="data-card-label">気温</p> </div>
+	  <div id="prec10m-card" class="data-card"> <i data-lucide="umbrella" class="w-8 h-8 text-blue-500"></i> <p id="prec10m" class="data-card-value"></p> <p class="data-card-label">降水量 (10分)</p> </div>
+	  <div id="prec1h-card" class="data-card"> <i data-lucide="cloud-rain" class="w-8 h-8 text-blue-600"></i> <p id="prec1h" class="data-card-value"></p> <p class="data-card-label">降水量 (1時間)</p> </div>
+	  <div id="wind-card" class="data-card"> <i data-lucide="wind" class="w-8 h-8 text-green-500"></i> <p id="wind" class="data-card-value"></p> <p id="wind-dir" class="data-card-label">風向・風速</p> </div>
+	  <div id="sun-card" class="data-card col-span-2 md:col-span-1 lg:col-span-1"> <i data-lucide="sun" class="w-8 h-8 text-yellow-500"></i> <p id="sun" class="data-card-value"></p> <p class="data-card-label">日照時間 (1時間)</p> </div>
+	  <div id="humidity-card" class="data-card">
+	    <i data-lucide="droplet" class="w-8 h-8 text-blue-400"></i>
+	    <p id="humidity" class="data-card-value"></p>
+	    <p class="data-card-label">湿度</p>
+	  </div>
+	</div>
+	<!-- 24時間グラフコンテナ -->
+	<div class="mt-8 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-lg p-4">
+	  <h3 class="text-lg font-bold text-gray-700 mb-2">過去24時間の推移</h3>
+	  <div id="chart-loading" class="text-gray-500">グラフデータを読み込み中...</div>
+	  <div class="relative h-64 md:h-80">
+	    <canvas id="hourly-chart"></canvas>
+	  </div>
+	</div>
+      </div>
+    </div>
+
+    <!-- 埋め込みHTML生成機能 -->
+    <div id="embed-generator-container" class="mt-8 pt-6 border-t border-gray-200">
+      <div class="flex items-center justify-between mb-4">
+	<div>
+	  <h3 class="text-lg font-bold text-gray-700">動的に更新される埋め込みHTMLを生成</h3>
+	  <p class="text-sm text-gray-500">下のボタンを押すと、自動更新機能付きのHTMLコードが生成されます。</p>
+	</div>
+	<button id="generate-html-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center">
+	  <i data-lucide="code" class="w-4 h-4 mr-2"></i>
+	  <span>生成する</span>
+	</button>
+      </div>
+      <div id="generated-html-wrapper" class="hidden">
+	<label for="generated-html" class="block mb-2 text-sm font-medium text-gray-700">生成されたHTMLコード (コピーしてサイトに貼り付けます)</label>
+	<textarea id="generated-html" readonly class="w-full h-64 bg-gray-900 text-white font-mono text-xs rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+	<div class="flex justify-end mt-2">
+	  <button id="copy-html-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center">
+	    <i data-lucide="copy" class="w-4 h-4 mr-2 icon-copy"></i>
+	    <i data-lucide="check" class="w-4 h-4 mr-2 icon-check hidden"></i>
+	    <span class="copy-text">コードをコピー</span>
+	  </button>
+	</div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer id="main-footer" class="text-center mt-8 text-xs text-gray-400">
+      <p>データソース: <a href="https://www.jma.go.jp/bosai/amedas/" target="_blank" class="underline hover:text-blue-500">気象庁ウェブサイト</a></p>
+      <p>このページは気象庁の公開する情報を元に独自に作成したものです。</p>
+    </footer>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM要素の取得 ---
+        const stationSelect = document.getElementById('station-select');
+        const dataContainer = document.getElementById('data-container');
+        const loadingDiv = document.getElementById('loading');
+        const errorDiv = document.getElementById('error');
+        const errorMessage = document.getElementById('error-message');
+        const dataDisplay = document.getElementById('data-display');
+        const refreshButton = document.getElementById('refresh-button');
+        const generateHtmlButton = document.getElementById('generate-html-button');
+        const generatedHtmlWrapper = document.getElementById('generated-html-wrapper');
+        const generatedHtmlTextarea = document.getElementById('generated-html');
+        const copyHtmlButton = document.getElementById('copy-html-button');
+        const chartLoadingDiv = document.getElementById('chart-loading');
+        const chartCanvas = document.getElementById('hourly-chart');
+
+        // --- グローバル変数 ---
+        let stationMaster = {};
+        let amedasData = {};
+        let autoRefreshInterval = null;
+        let hourlyChart = null;
+        let latestTimeISO = null;
+
+        // --- 定数 ---
+        const JMA_STATION_LIST_URL = 'https://www.jma.go.jp/bosai/amedas/const/amedastable.json';
+        const JMA_LATEST_TIME_URL = 'https://www.jma.go.jp/bosai/amedas/data/latest_time.txt';
+        const JMA_DATA_MAP_BASE_URL = 'https://www.jma.go.jp/bosai/amedas/data/map/';
+        const JMA_HOURLY_DATA_BASE_URL = 'https://www.jma.go.jp/bosai/amedas/data/point/';
+        const AUTO_REFRESH_RATE = 10 * 60 * 1000; // 10分
+
+        const WIND_DIRECTIONS = ['静穏','北北東','北東','東北東','東','東南東','南東','南南東','南','南南西','南西','西南西','西','西北西','北西','北北西','北'];
+
+        // --- 関数定義 ---
+        const showError = (message) => {
+            errorMessage.textContent = message;
+            loadingDiv.style.display = 'none';
+            dataDisplay.style.display = 'none';
+            errorDiv.style.display = 'block';
+        };
+
+        const fetchStations = async () => {
+            try {
+                const response = await fetch(JMA_STATION_LIST_URL);
+                if (!response.ok) throw new Error(`観測地点リストの取得に失敗しました (HTTP ${response.status})`);
+                stationMaster = await response.json();
+                stationSelect.innerHTML = '';
+                // 新：観測所コード（キー）を数値として昇順ソート
+                const sortedStations = Object.keys(stationMaster).sort((a, b) => Number(a) - Number(b));
+
+                sortedStations.forEach(key => {
+                    const station = stationMaster[key];
+                    if (station.type === 'A' || station.type === 'B') {
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.textContent = `${station.kjName} (${station.knName})`;
+                        stationSelect.appendChild(option);
+                    }
+                });
+            } catch (error) {
+                console.error('Error fetching station list:', error);
+                showError('観測地点リストの読み込みに失敗しました。');
+                return false;
+            }
+            return true;
+        };
+
+        const fetchAmedasData = async () => {
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            dataDisplay.style.display = 'none';
+            try {
+                const timeResponse = await fetch(JMA_LATEST_TIME_URL);
+                if (!timeResponse.ok) throw new Error(`最新時刻の取得に失敗しました (HTTP ${response.status})`);
+                latestTimeISO = (await timeResponse.text()).trim();
+                const latestTimeFormatted = latestTimeISO.replace(/-/g, '').replace('T', '').replace(/:/g, '').slice(0, 14);
+                const dataUrl = `${JMA_DATA_MAP_BASE_URL}${latestTimeFormatted}.json`;
+                const dataResponse = await fetch(dataUrl);
+                if (!dataResponse.ok) throw new Error(`気象データの取得に失敗しました (HTTP ${dataResponse.status})`);
+                amedasData = await dataResponse.json();
+                const date = new Date(latestTimeISO);
+                document.getElementById('observation-time').textContent = `観測時刻: ${date.toLocaleString('ja-JP')}`;
+            } catch (error) {
+                console.error('Error fetching AMeDAS data:', error);
+                showError('気象データの読み込みに失敗しました。');
+                return false;
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+            return true;
+        };
+
+        const fetchHourlyData = async (stationId) => {
+            chartLoadingDiv.style.display = 'block';
+            chartCanvas.style.display = 'none';
+            if (!latestTimeISO) {
+                chartLoadingDiv.innerText = '基準時刻が取得できていません。';
+                return null;
+            }
+
+            // ★★★ 修正: データ取得ロジックを全面的に見直し ★★★
+            const baseTime = new Date(latestTimeISO);
+            baseTime.setMinutes(0, 0, 0);
+            const latestHour = baseTime.getHours();
+            const startHour = latestHour - (latestHour % 3);
+            baseTime.setHours(startHour);
+
+            const requests = [];
+            // 3時間ごとのデータを9回取得して過去27時間分をカバー
+            for (let i = 0; i < 9; i++) {
+                const targetDate = new Date(baseTime.getTime() - i * 3 * 3600 * 1000);
+                const y = targetDate.getFullYear();
+                const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+                const d = String(targetDate.getDate()).padStart(2, '0');
+                const h = String(targetDate.getHours()).padStart(2, '0');
+
+                const url = `${JMA_HOURLY_DATA_BASE_URL}${stationId}/${y}${m}${d}_${h}.json`;
+                requests.push(fetch(url).then(res => res.ok ? res.json() : null).catch(() => null));
+            }
+
+            const results = await Promise.all(requests);
+            const hourlyDataMap = new Map();
+
+            // 取得した全データをMapに格納して重複を排除
+            results.forEach(hourChunk => {
+                if (hourChunk) {
+                    for (const timeKey in hourChunk) {
+                        // 1時間ごとのデータのみを抽出
+                        if(timeKey.endsWith("0000")) {
+                            hourlyDataMap.set(timeKey, hourChunk[timeKey]);
+                        }
+                    }
+                }
+            });
+
+            // Mapのキー(時刻)をソートし、最新24件を取得
+            const sortedKeys = Array.from(hourlyDataMap.keys()).sort().slice(-24);
+
+            const chartData = { labels: [], temps: [], precs: [] };
+
+            sortedKeys.forEach(timeKey => {
+                const dataPoint = hourlyDataMap.get(timeKey);
+                const hour = parseInt(timeKey.substring(8, 10));
+
+                chartData.labels.push(`${hour}時`);
+                chartData.temps.push(dataPoint && dataPoint.temp && dataPoint.temp[1] === 0 ? dataPoint.temp[0] : null);
+                chartData.precs.push(dataPoint && dataPoint.precipitation1h && dataPoint.precipitation1h[1] === 0 ? dataPoint.precipitation1h[0] : null);
+            });
+
+            chartLoadingDiv.style.display = 'none';
+            chartCanvas.style.display = 'block';
+            return chartData;
+        };
+
+        const renderChart = (chartData) => {
+            if (!chartData) return;
+            if (hourlyChart) {
+                hourlyChart.destroy();
+            }
+            hourlyChart = new Chart(chartCanvas, {
+                type: 'bar',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: '気温(℃)',
+                            data: chartData.temps,
+                            borderColor: 'rgba(239, 68, 68, 0.8)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                            yAxisID: 'y_temp',
+                            tension: 0.2,
+                            fill: true,
+                            spanGaps: true,
+                        },
+                        {
+                            type: 'bar',
+                            label: '降水量(mm)',
+                            data: chartData.precs,
+                            backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                            yAxisID: 'y_prec',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y_temp: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: '気温(℃)' }
+                        },
+                        y_prec: {
+                            type: 'linear',
+                            position: 'right',
+                            title: { display: true, text: '降水量(mm)' },
+                            grid: { drawOnChartArea: false },
+                            beginAtZero: true,
+                        }
+                    }
+                }
+            });
+        };
+
+        const displayStationData = async () => {
+            const stationId = stationSelect.value;
+            if (!stationId || !stationMaster[stationId]) {
+                showError('観測地点のマスタ情報が見つかりません。');
+                return;
+            }
+            if (!amedasData[stationId]) {
+                document.getElementById('station-name').textContent = stationMaster[stationId]?.kjName || 'データなし';
+                showError('選択された地点のデータが現在利用できません。');
+                dataDisplay.style.display = 'block';
+                ['temp-card', 'prec10m-card', 'prec1h-card', 'wind-card', 'sun-card','humidity-card'].forEach(id => {
+                    document.getElementById(id).style.display = 'none';
+                });
+                return;
+            }
+
+            const stationInfo = stationMaster[stationId];
+            const stationData = amedasData[stationId];
+            document.getElementById('station-name').textContent = stationInfo.kjName;
+
+            const updateCard = (elementId, dataKey, unit = '', formatter = null) => {
+                const card = document.getElementById(elementId);
+                const valueEl = card.querySelector('.data-card-value');
+                const data = stationData[dataKey];
+                if (data) {
+                    const value = data[0];
+                    const status = data[1];
+                    valueEl.textContent = (status === 0) ? (formatter ? formatter(value) : `${value}${unit}`) : '-';
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            };
+
+            updateCard('temp-card', 'temp', '℃');
+            updateCard('prec10m-card', 'precipitation10m', 'mm');
+            updateCard('prec1h-card', 'precipitation1h', 'mm');
+            updateCard('sun-card', 'sun1h', 'h');
+            updateCard('humidity-card', 'humidity', '%');
+
+            const windCard = document.getElementById('wind-card');
+            if (stationData.wind && stationData.windDirection) {
+                const windSpeed = stationData.wind[0];
+                const windDirCode = stationData.windDirection[0];
+                if (stationData.wind[1] === 0 && stationData.windDirection[1] === 0) {
+                    document.getElementById('wind').textContent = `${windSpeed.toFixed(1)}m/s`;
+                    document.getElementById('wind-dir').textContent = WIND_DIRECTIONS[windDirCode] || '不明';
+                } else {
+                    document.getElementById('wind').textContent = '-';
+                    document.getElementById('wind-dir').textContent = '風向・風速';
+                }
+                windCard.style.display = 'flex';
+            } else {
+                windCard.style.display = 'none';
+            }
+
+            errorDiv.style.display = 'none';
+            dataDisplay.style.display = 'block';
+
+            const hourlyData = await fetchHourlyData(stationId);
+            renderChart(hourlyData);
+        };
+
+        const handleRefresh = async () => {
+            const refreshIcon = refreshButton.querySelector('svg');
+            if (refreshIcon) {
+                refreshIcon.classList.add('animate-spin');
+            }
+            refreshButton.disabled = true;
+
+            const success = await fetchAmedasData();
+            if (success) {
+                await displayStationData();
+            }
+
+            if (refreshIcon) {
+                refreshIcon.classList.remove('animate-spin');
+            }
+            refreshButton.disabled = false;
+        };
+
+        const generateDynamicEmbedHtml = () => {
+            const stationId = stationSelect.value;
+            if (!stationId || !stationMaster[stationId]) {
+                alert('地点を選択してください。');
+                return;
+            }
+
+            const stationInfo = stationMaster[stationId];
+            const uniqueId = `amedas-widget-${stationId}-${Date.now()}`;
+
+            const script = `
+    <!-- Start of AMeDAS Weather Widget -->
+    <div id="${uniqueId}">読み込み中...</div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
+    <script>
+    (() => {
+	         const WIDGET_ID = '${uniqueId}';
+	         const STATION_ID = '${stationId}';
+	         const STATION_NAME = '${stationInfo.kjName}';
+	         const LATEST_TIME_URL = 'https://www.jma.go.jp/bosai/amedas/data/latest_time.txt';
+	         const DATA_MAP_URL = 'https://www.jma.go.jp/bosai/amedas/data/map/';
+	         const HOURLY_DATA_URL = 'https://www.jma.go.jp/bosai/amedas/data/point/';
+	         const REFRESH_RATE = 10 * 60 * 1000; // 10分
+	         const WIND_DIRECTIONS = ['静穏','北北東','北東','東北東','東','東南東','南東','南南東','南','南南西','南西','西南西','西','西北西','北西','北北西','北'];
+	         const ICONS = {
+				         temp: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>',
+				         prec10m: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12a10.06 10.06 0 0 0-20 0Z"/><path d="M12 12v8a2 2 0 0 0 4 0"/><path d="M12 2v1"/></svg>',
+				         prec1h: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 14v6"/><path d="M8 14v6"/><path d="M12 16v6"/></svg>',
+				         wind: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>',
+				         sun: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
+				         humidity: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.21l-.61.6C7.33 7.23 4 10.39 4 14a8 8 0 0 0 16 0c0-3.61-3.33-6.77-7.39-11.19l-.61-.6z"/></svg>'
+				     };
+	         let hourlyChartInstance = null;
+	         const widgetElement = document.getElementById(WIDGET_ID);
+
+	         const render = (stationData, hourlyData) => {
+							               const createCard = (icon, label, value) => \`
+							                   <div style="background-color: white; border-radius: 8px; padding: 12px; text-align: center; border: 1px solid #f3f4f6; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+							                     \${icon}
+							                     <p style="font-size: 1.25rem; font-weight: bold; color: #1f2937; margin: 4px 0 0 0;">\${value}</p>
+							                     <p style="font-size: 0.75rem; color: #6b7280; margin: 4px 0 0 0;">\${label}</p>
+							                   </div>\`;
+
+							               const getValue = (key, unit = '') => (stationData && stationData[key] && stationData[key][1] === 0) ? \`\${stationData[key][0]}\${unit}\` : '-';
+							               const getWind = () => (stationData && stationData.wind && stationData.windDirection && stationData.wind[1] === 0 && stationData.windDirection[1] === 0) ? \`\${WIND_DIRECTIONS[stationData.windDirection[0]]} \${stationData.wind[0].toFixed(1)}m/s\` : '-';
+
+							               const obsTime = stationData ? new Date(stationData.obsTimeISO).toLocaleString('ja-JP') : '取得中';
+
+							               widgetElement.innerHTML = \`
+							       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; background-color: #f9fafb; max-width: 600px; margin: auto;">
+							         <h2 style="font-size: 1.5rem; font-weight: bold; text-align: center; margin: 0 0 4px 0; color: #1f2937;">\${STATION_NAME} の天気</h2>
+							         <p style="font-size: 0.875rem; text-align: center; margin: 0 0 16px 0; color: #6b7280;">観測時刻: \${obsTime}</p>
+							         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px;">
+							           \${createCard(ICONS.temp, '気温', getValue('temp', '℃'))}
+							           \${createCard(ICONS.prec10m, '降水量(10分)', getValue('precipitation10m', 'mm'))}
+							           \${createCard(ICONS.prec1h, '降水量(1時間)', getValue('precipitation1h', 'mm'))}
+							           \${createCard(ICONS.wind, '風向・風速', getWind())}
+							           \${createCard(ICONS.sun, '日照時間', getValue('sun1h', 'h'))}
+							           \${createCard(ICONS.humidity, '湿度', getValue('humidity', '%'))}
+							         </div>
+							         <div style="margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
+							             <h3 style="font-size: 1.125rem; font-weight: bold; text-align: center; color: #1f2937; margin-bottom: 8px;">過去24時間の推移</h3>
+							             <div style="position: relative; height: 250px;"><canvas id="\${WIDGET_ID}-chart"></canvas></div>
+							         </div>
+							         <p style="font-size: 0.75rem; text-align: right; margin: 12px 0 0 0; color: #9ca3af;">データ: 気象庁</p>
+							       </div>\`;
+
+							               const chartCanvas = document.getElementById(\`\${WIDGET_ID}-chart\`);
+							               if (!chartCanvas || !hourlyData) return;
+							               if (hourlyChartInstance) hourlyChartInstance.destroy();
+							               hourlyChartInstance = new Chart(chartCanvas, {
+														                  type: 'bar',
+														                  data: {
+																	                  labels: hourlyData.labels,
+																	                  datasets: [
+																				                          { type: 'line', label: '気温(℃)', data: hourlyData.temps, borderColor: 'rgba(239, 68, 68, 0.8)', backgroundColor: 'rgba(239, 68, 68, 0.2)', yAxisID: 'y_temp', tension: 0.2, fill: true, spanGaps: true },
+																				                          { type: 'bar', label: '降水量(mm)', data: hourlyData.precs, backgroundColor: 'rgba(59, 130, 246, 0.6)', yAxisID: 'y_prec' }
+																				                      ]
+																	              },
+														                  options: {
+																	                     responsive: true, maintainAspectRatio: false,
+																	                     scales: {
+																				                           y_temp: { type: 'linear', position: 'left', title: { display: true, text: '気温(℃)' } },
+																				                           y_prec: { type: 'linear', position: 'right', title: { display: true, text: '降水量(mm)' }, grid: { drawOnChartArea: false }, beginAtZero: true }
+																				                       }
+																	                 }
+														              });
+							           };
+
+	         const fetchData = async () => {
+						         try {
+							                   const timeRes = await fetch(LATEST_TIME_URL);
+							                   if (!timeRes.ok) throw new Error('Time fetch failed');
+							                   const latestTimeISO = (await timeRes.text()).trim();
+
+							                   const latestTimeFormatted = latestTimeISO.replace(/[-T:]/g, '').slice(0, 14);
+															                  const dataRes = await fetch(\`\${DATA_MAP_URL}\${latestTimeFormatted}.json\`);
+																	              if (!dataRes.ok) throw new Error('Data fetch failed');
+																		                  const amedasData = await dataRes.json();
+																				              const stationData = amedasData[STATION_ID];
+																					                  if (stationData) stationData.obsTimeISO = latestTimeISO;
+
+																							              const baseTime = new Date(latestTimeISO);
+																								                  baseTime.setMinutes(0,0,0);
+																										              const latestHour = baseTime.getHours();
+																											                  const startHour = latestHour - (latestHour % 3);
+																													              baseTime.setHours(startHour);
+
+																														                  const hourlyRequests = [];
+																																              for (let i = 0; i < 9; i++) {
+																																	                      const d = new Date(baseTime.getTime() - i * 3 * 3600 * 1000);
+																																			                      const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0'), h = String(d.getHours()).padStart(2, '0');
+																																					                      hourlyRequests.push(fetch(\`\${HOURLY_DATA_URL}\${STATION_ID}/\${y}\${m}\${day}_\${h}.json\`).then(res => res.ok ? res.json() : null).catch(()=>null));
+																																							                  }
+																																									              const hourlyResults = await Promise.all(hourlyRequests);
+																																										                  const hourlyDataMap = new Map();
+																																												              hourlyResults.forEach(hChunk => {
+																																													                      if(hChunk) {
+																																															                          for(const timeKey in hChunk) {
+																																																		                          if(timeKey.endsWith("0000")) {
+																																																					                              hourlyDataMap.set(timeKey, hChunk[timeKey]);
+																																																								                              }
+																																																											                          }
+																																																														                  }
+																																																																              });
+
+																																																																	                  const sortedKeys = Array.from(hourlyDataMap.keys()).sort().slice(-24);
+																																																																			              const hourlyData = { labels: [], temps: [], precs: [] };
+																																																																				                  sortedKeys.forEach(timeKey => {
+																																																																						                  const dataPoint = hourlyDataMap.get(timeKey);
+																																																																								                  const hour = parseInt(timeKey.substring(8, 10));
+																																																																										                  hourlyData.labels.push(\`\${hour}時\`);
+																																																																												                  hourlyData.temps.push(dataPoint && dataPoint.temp && dataPoint.temp[1] === 0 ? dataPoint.temp[0] : null);
+																																																																														                  hourlyData.precs.push(dataPoint && dataPoint.precipitation1h && dataPoint.precipitation1h[1] === 0 ? dataPoint.precipitation1h[0] : null);
+																																																																																              });
+
+																																																																																	                  render(stationData, hourlyData);
+
+																																																																																			          } catch (error) {
+																																																																																				              console.error('AMeDAS Widget Error:', error);
+																																																																																					                  widgetElement.innerHTML = \`<div style="color: red; text-align: center;">\${STATION_NAME}のデータ取得に失敗しました。</div>\`;
+																																																																																							          }
+																																																																																								      };
+
+																																																																																								          fetchData();
+																																																																																									      setInterval(fetchData, REFRESH_RATE);
+																																																																																									      })();
+																																																																																									      <\/script>
+																																																																																									      <!-- End of AMeDAS Weather Widget -->`;
+
+	    generatedHtmlTextarea.value = script.trim();
+	    generatedHtmlWrapper.style.display = 'block';
+	    generatedHtmlTextarea.focus();
+	    generatedHtmlTextarea.select();
+	};
+
+	const initialize = async () => {
+	    const stationsLoaded = await fetchStations();
+	    if (stationsLoaded) {
+	        stationSelect.value = '44132'; // 東京をデフォルト
+		await handleRefresh();
+	    }
+
+	    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+	    autoRefreshInterval = setInterval(handleRefresh, AUTO_REFRESH_RATE);
+
+	    lucide.createIcons();
+	};
+
+	// --- イベントリスナー ---
+	stationSelect.addEventListener('change', handleRefresh);
+	refreshButton.addEventListener('click', handleRefresh);
+	generateHtmlButton.addEventListener('click', generateDynamicEmbedHtml);
+
+	copyHtmlButton.addEventListener('click', () => {
+	    generatedHtmlTextarea.focus();
+	    generatedHtmlTextarea.select();
+	    try {
+	        document.execCommand('copy');
+
+		const iconCopy = copyHtmlButton.querySelector('.icon-copy');
+		const iconCheck = copyHtmlButton.querySelector('.icon-check');
+		const textSpan = copyHtmlButton.querySelector('.copy-text');
+
+		iconCopy.classList.add('hidden');
+		iconCheck.classList.remove('hidden');
+		textSpan.textContent = 'コピーしました';
+		copyHtmlButton.classList.replace('bg-gray-500', 'bg-indigo-500');
+		copyHtmlButton.classList.replace('hover:bg-gray-600', 'hover:bg-indigo-600');
+
+		setTimeout(() => {
+		    iconCopy.classList.remove('hidden');
+		    iconCheck.classList.add('hidden');
+		    textSpan.textContent = 'コードをコピー';
+		    copyHtmlButton.classList.replace('bg-indigo-500', 'bg-gray-500');
+		    copyHtmlButton.classList.replace('hover:bg-indigo-600', 'hover:bg-gray-600');
+		}, 2000);
+	    } catch (err) {
+	        console.error('コピーに失敗しました', err);
+		alert('コピーに失敗しました。');
+	    }
+	});
+
+	// --- 初期化実行 ---
+	initialize();
+    });
+    </script>
+</body>
+</html>

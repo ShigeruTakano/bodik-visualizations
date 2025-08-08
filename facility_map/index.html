@@ -1,0 +1,378 @@
+t: 20px;
+animation: spin 1s linear infinite;
+}
+@keyframes spin {
+0% { transform: rotate(0deg); }
+100% { transform: rotate(360deg); }
+}
+/* Ensure Leaflet map renders correctly */
+.leaflet-container {
+height: 100%;
+width: 100%;
+}
+</style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+  <div class="container mx-auto p-4 sm:p-6 md:p-8">
+    <header class="text-center mb-8">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">BODIK 施設マップ ジェネレーター</h1>
+      <p class="mt-2 text-gray-600">BODIK ODCS上の施設データ（避難所、AED等）を地図上に可視化するHTMLを生成します。</p>
+    </header>
+
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-lg space-y-6">
+      <!-- Step 1: CKAN API Endpoint Input -->
+      <div>
+	<label for="ckanUrl" class="block text-sm font-semibold text-gray-700 mb-1">1. CKANサイトのURL</label>
+	<input type="text" id="ckanUrl" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" value="https://data.bodik.jp">
+	<p class="text-xs text-gray-500 mt-1">例: https://data.bodik.jp, https://ckan.open-governmentdata.org/</p>
+      </div>
+
+      <!-- Step 2: Organization ID (Optional) -->
+      <div>
+	<label for="orgId" class="block text-sm font-semibold text-gray-700 mb-1">2. 自治体・組織ID (任意)</label>
+	<div class="flex flex-col sm:flex-row gap-2">
+	  <input type="text" id="orgId" class="flex-grow p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="指定した組織内のみを検索します">
+	  <button id="fetchDatasetsBtn" class="flex items-center justify-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+	    <span id="btnText">データセット取得</span>
+	    <div id="loader" class="loader hidden ml-2"></div>
+	  </button>
+	</div>
+	<p class="text-xs text-gray-500 mt-1">例: 401307 (福岡市の場合)</p>
+      </div>
+
+      <!-- Step 3: Dataset Selection -->
+      <div>
+	<label for="resourceSelect" class="block text-sm font-semibold text-gray-700 mb-1">3. 施設データセットを選択</label>
+	<select id="resourceSelect" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" disabled>
+	  <option>先にCKANサイトのURLを入力してください</option>
+	</select>
+	<p id="searchStatus" class="text-sm text-gray-500 mt-1 h-5"></p>
+      </div>
+
+      <!-- Step 4: Visualization Preview -->
+      <div class="bg-gray-50 p-4 rounded-lg">
+	<h3 class="text-lg font-semibold mb-2 text-center">4. プレビュー</h3>
+	<div id="mapContainer" class="relative min-h-[400px] h-[50vh] bg-gray-200 rounded">
+	  <div id="mapPlaceholder" class="absolute inset-0 flex items-center justify-center text-gray-500">
+	    データを選択するとここに地図が表示されます
+	  </div>
+	</div>
+      </div>
+
+      <!-- Step 5: Generated HTML Code -->
+      <div>
+	<h3 class="text-lg font-semibold mb-2">5. 埋め込み用HTMLコード</h3>
+	<p class="text-sm text-gray-600 mb-2">下のコードをコピーして、GoogleサイトなどのHTML埋め込み機能に貼り付けてください。</p>
+	<textarea id="generatedHtml" class="w-full h-48 p-2 border border-gray-300 rounded-md bg-gray-900 text-gray-200 font-mono text-xs" readonly>ここにコードが生成されます</textarea>
+	<button id="copyBtn" class="mt-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">コードをコピー</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Modal -->
+  <div id="errorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+      <div class="mt-3 text-center">
+	<div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+	  <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+	</div>
+	<h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">エラー</h3>
+	<div class="mt-2 px-7 py-3"><p id="errorMessage" class="text-sm text-gray-500"></p></div>
+	<div class="items-center px-4 py-3"><button id="closeErrorModalBtn" class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300">閉じる</button></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- DOM Elements ---
+    const dom = {
+        ckanUrl: document.getElementById('ckanUrl'),
+        orgId: document.getElementById('orgId'),
+        fetchBtn: document.getElementById('fetchDatasetsBtn'),
+        btnText: document.getElementById('btnText'),
+        loader: document.getElementById('loader'),
+        resourceSelect: document.getElementById('resourceSelect'),
+        searchStatus: document.getElementById('searchStatus'),
+        mapContainer: document.getElementById('mapContainer'),
+        mapPlaceholder: document.getElementById('mapPlaceholder'),
+        generatedHtml: document.getElementById('generatedHtml'),
+        copyBtn: document.getElementById('copyBtn'),
+        errorModal: document.getElementById('errorModal'),
+        errorMessage: document.getElementById('errorMessage'),
+        closeErrorModalBtn: document.getElementById('closeErrorModalBtn'),
+    };
+
+    // --- Application State ---
+    let mapInstance = null;
+    let allResources = [];
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+        dom.fetchBtn.addEventListener('click', onFetchClick);
+        dom.resourceSelect.addEventListener('change', onResourceSelect);
+        dom.copyBtn.addEventListener('click', copyToClipboard);
+        dom.closeErrorModalBtn.addEventListener('click', hideError);
+    });
+
+    // --- UI Update Functions ---
+    const ui = {
+        setLoading(isLoading, text = 'データセット取得') {
+            dom.fetchBtn.disabled = isLoading;
+            dom.loader.classList.toggle('hidden', !isLoading);
+            dom.btnText.textContent = text;
+        },
+        updateSearchStatus(message) {
+            dom.searchStatus.textContent = message;
+        },
+        updateResourceSelect(resources) {
+            dom.resourceSelect.innerHTML = '';
+            if (resources.length > 0) {
+                dom.resourceSelect.disabled = false;
+                const defaultOption = new Option('データセットを選択してください', '');
+                dom.resourceSelect.add(defaultOption);
+                resources.forEach((res, index) => {
+                    const option = new Option(res.name, index);
+                    dom.resourceSelect.add(option);
+                });
+            } else {
+                dom.resourceSelect.disabled = true;
+                const option = new Option('位置情報を含むCSVデータが見つかりません', '');
+                dom.resourceSelect.add(option);
+            }
+        },
+        showMapPlaceholder(message) {
+            dom.mapPlaceholder.textContent = message;
+            dom.mapPlaceholder.style.display = 'flex';
+            if (mapInstance) {
+                mapInstance.remove();
+                mapInstance = null;
+            }
+        },
+        renderMap(points) {
+            dom.mapPlaceholder.style.display = 'none';
+            if (mapInstance) mapInstance.remove();
+
+            mapInstance = L.map(dom.mapContainer).setView([35.681, 139.767], 5); // Default to Tokyo
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+	    }).addTo(mapInstance);
+
+	    if (points.length === 0) return;
+
+	    const markers = L.featureGroup();
+	    points.forEach(p => {
+	        const marker = L.marker([p.lat, p.lon]);
+		let popupContent = `<b>${p.name || '名称不明'}</b>`;
+		Object.entries(p.properties).forEach(([key, value]) => {
+		    if (value) popupContent += `<br><b>${key}</b>: ${value}`;
+		});
+		marker.bindPopup(popupContent);
+		markers.addLayer(marker);
+	    });
+	    markers.addTo(mapInstance);
+	    mapInstance.fitBounds(markers.getBounds().pad(0.1));
+	}
+    };
+
+    // --- Error Handling ---
+    function showError(message) {
+        console.error(message);
+	dom.errorMessage.textContent = message;
+	dom.errorModal.classList.remove('hidden');
+    }
+
+    function hideError() {
+        dom.errorModal.classList.add('hidden');
+    }
+
+    // --- Event Handlers ---
+    async function onFetchClick() {
+        const baseUrl = dom.ckanUrl.value.trim().replace(/\/$/, '');
+	const orgId = dom.orgId.value.trim();
+	if (!baseUrl) {
+	    showError('CKANサイトのURLを入力してください。');
+	    return;
+	}
+
+	ui.setLoading(true, '検索中...');
+	ui.updateSearchStatus('施設関連データセットを検索しています...');
+	ui.updateResourceSelect([]);
+
+	try {
+	    const packages = await api.searchPackages(baseUrl, orgId);
+	    if (packages.length === 0) {
+	        ui.updateSearchStatus('指定された条件で施設関連のデータセットが見つかりませんでした。');
+		return;
+	    }
+
+	    allResources = packages.flatMap(pkg =>
+	        pkg.resources
+		    .filter(res => res.format && res.format.toLowerCase().includes('csv'))
+		    .map(res => ({ id: res.id, name: `${pkg.title} / ${res.name}` }))
+	    );
+
+	    ui.updateResourceSelect(allResources);
+	    ui.updateSearchStatus(allResources.length > 0
+	                          ? `${allResources.length}件のCSVリソースが見つかりました。`
+				  : '施設関連データセット内にCSV形式のリソースが見つかりませんでした。');
+
+	} catch (error) {
+	    showError(`データセットの取得に失敗しました: ${error.message}`);
+	    ui.updateSearchStatus('取得エラー');
+	} finally {
+	    ui.setLoading(false);
+	}
+    }
+
+    async function onResourceSelect() {
+        const selectedIndex = dom.resourceSelect.value;
+	if (!selectedIndex) {
+	    ui.showMapPlaceholder('データを選択するとここに地図が表示されます');
+	    return;
+	}
+
+	const resource = allResources[parseInt(selectedIndex, 10)];
+	ui.setLoading(true, 'データ取得中...');
+	ui.showMapPlaceholder('位置情報を読み込んでいます...');
+
+	try {
+	    const records = await api.fetchResourceData(dom.ckanUrl.value, resource.id);
+	    const points = dataProcessor.process(records);
+
+	    if (points.length === 0) {
+	        throw new Error('データ内に有効な緯度・経度情報が見つかりませんでした。');
+	    }
+
+	    ui.renderMap(points);
+	    const html = htmlGenerator.create(points, resource.name);
+	    dom.generatedHtml.value = html;
+
+	} catch (error) {
+	    showError(error.message);
+	    ui.showMapPlaceholder('データの処理中にエラーが発生しました。');
+	} finally {
+	    ui.setLoading(false);
+	}
+    }
+
+    // --- API Layer ---
+    const api = {
+        async _fetchWithProxy(url) {
+	    const proxies = ['https://corsproxy.io/?', 'https://api.allorigins.win/raw?url=', 'https://cors-proxy.htmldriven.com/?url='];
+            let lastError = null;
+            for (const proxy of proxies) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                try {
+                    const proxiedUrl = proxy + encodeURIComponent(url);
+                    const response = await fetch(proxiedUrl, { signal: controller.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    clearTimeout(timeoutId);
+                    if (!response.ok) {
+                        lastError = new Error(`プロキシがエラーステータス ${response.status} を返しました`);
+                        continue;
+                    }
+                    const textResponse = await response.text();
+                    try {
+                        return JSON.parse(textResponse);
+                    } catch (e) {
+                        console.error("プロキシがJSONではない応答を返しました:", textResponse);
+                        lastError = new Error(`プロキシがJSONではない応答を返しました`);
+                        continue;
+                    }
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    lastError = e.name === 'AbortError' ? new Error("リクエストがタイムアウトしました") : e;
+                    console.warn(`プロキシ ${proxy} が失敗しました。`, lastError);
+                }
+            }
+            throw new Error(`全てのプロキシ経由でのデータ取得に失敗しました。最後のプロキシエラー: ${lastError ? lastError.message : '不明'}`);
+        },
+        async searchPackages(baseUrl, orgId) {
+            const searchTerms = ['施設', '避難所', 'AED', '公園', '消防水利', 'map', 'gis', 'location', '位置情報', '緯度', '経度'];
+            for (const term of searchTerms) {
+                let searchUrl = `${baseUrl}/api/3/action/package_search?q=${term}&rows=100`;
+                if (orgId) searchUrl += `&fq=organization:${encodeURIComponent(orgId)}`;
+                const data = await this._fetchWithProxy(searchUrl);
+                if (data.success && data.result.results.length > 0) return data.result.results;
+            }
+            return [];
+        },
+        async fetchResourceData(baseUrl, resourceId) {
+            const apiUrl = `${baseUrl.trim().replace(/\/$/, '')}/api/3/action/datastore_search?resource_id=${resourceId}&limit=5000`;
+            const data = await this._fetchWithProxy(apiUrl);
+            if (!data.success) throw new Error('データストアからのデータ取得に失敗しました: ' + JSON.stringify(data.error));
+            return data.result.records;
+        }
+    };
+
+    // --- Data Processing Layer ---
+    const dataProcessor = {
+        _findKey(keys, candidates) {
+            const lowerKeys = keys.map(k => k.toLowerCase());
+            for (const candidate of candidates) {
+                const lowerCandidate = candidate.toLowerCase();
+                const index = lowerKeys.indexOf(lowerCandidate);
+                if (index > -1) return keys[index];
+            }
+            return null;
+        },
+        process(records) {
+            if (!records || records.length === 0) return [];
+
+            const keys = Object.keys(records[0]);
+            const latKey = this._findKey(keys, ['緯度', 'lat', 'latitude']);
+            const lonKey = this._findKey(keys, ['経度', 'lon', 'lng', 'longitude']);
+            const nameKey = this._findKey(keys, ['名称', '施設名', 'name', 'title']);
+
+            if (!latKey || !lonKey) return [];
+
+            return records.map(rec => {
+                const lat = parseFloat(rec[latKey]);
+                const lon = parseFloat(rec[lonKey]);
+
+                if (isNaN(lat) || isNaN(lon)) return null;
+
+                const properties = {};
+                Object.entries(rec).forEach(([key, value]) => {
+                    if (key !== latKey && key !== lonKey && key !== nameKey && value) {
+                        properties[key] = value;
+                    }
+                });
+
+                return { lat, lon, name: rec[nameKey], properties };
+            }).filter(Boolean); // filter out null values
+        }
+    };
+
+    // --- HTML Generator ---
+    const htmlGenerator = {
+        create(points, title) {
+            const sanitizedTitle = title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	    const pointsJson = JSON.stringify(points).replace(/</g, '\\u003c');
+	    return `
+	    <!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>施設マップ: ${sanitizedTitle}</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""><\/script><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;height:100vh;margin:0;background-color:#f9fafb;padding:1rem;box-sizing:border-box}h1{font-size:1.25rem;margin-bottom:1rem;color:#111827;text-align:center}#map{height:100%;width:100%;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1)}<\/style></head><body><h1>${sanitizedTitle}</h1><div id="map"></div><script>const points=${pointsJson};const map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);if(points.length>0){const markers=L.featureGroup();points.forEach(p=>{const marker=L.marker([p.lat,p.lon]);let popupContent=\`<b>\${p.name||'名称不明'}</b>\`;Object.entries(p.properties).forEach(([key,value])=>{if(value)popupContent+=\`<br><b>\${key}</b>: \${value}\`});marker.bindPopup(popupContent);markers.addLayer(marker)});markers.addTo(map);map.fitBounds(markers.getBounds().pad(0.1))}else{map.setView([35.68,139.76],5)}<\/script></body></html>`;
+	}
+    };
+
+    // --- Utility Functions ---
+    async function copyToClipboard() {
+        const code = dom.generatedHtml.value;
+	if (!code || code === 'ここにコードが生成されます') {
+	    showError('コピーするコードがありません。まず地図を生成してください。');
+	    return;
+	}
+	try {
+	    await navigator.clipboard.writeText(code);
+	    dom.copyBtn.textContent = 'コピーしました！';
+	} catch (err) {
+	    dom.generatedHtml.select();
+	    document.execCommand('copy');
+	    dom.copyBtn.textContent = 'コピーしました！(Fallback)';
+	} finally {
+	    setTimeout(() => { dom.copyBtn.textContent = 'コードをコピー'; }, 2000);
+	}
+    }
+    </script>
+</body>
+</html>

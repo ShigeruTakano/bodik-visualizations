@@ -1,0 +1,687 @@
+ray-800">
+
+<div class="container mx-auto p-4 sm:p-6 md:p-8">
+  <header class="text-center mb-8">
+    <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">BODIK 人口ピラミッド ジェネレーター</h1>
+    <p class="mt-2 text-gray-600">BODIK ODCS上の人口データを選択し、埋め込み可能な人口ピラミッドを生成します。</p>
+  </header>
+
+  <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-lg space-y-6">
+    <!-- Step 1: CKAN API Endpoint Input -->
+    <div>
+      <label for="ckanUrl" class="block text-sm font-semibold text-gray-700 mb-1">1. CKANサイトのURL</label>
+      <input type="text" id="ckanUrl" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" value="https://data.bodik.jp">
+      <p class="text-xs text-gray-500 mt-1">例: https://data.bodik.jp, https://data.e-stat.go.jp/</p>
+    </div>
+
+    <!-- Step 2: Organization ID (Optional) -->
+    <div>
+      <label for="orgId" class="block text-sm font-semibold text-gray-700 mb-1">2. 自治体・組織ID (任意)</label>
+      <div class="flex flex-col sm:flex-row gap-2">
+	<input type="text" id="orgId" class="flex-grow p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="指定した組織内のみを検索します">
+	<button id="fetchDatasetsBtn" class="flex items-center justify-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+	  <span id="btnText">データセット取得</span>
+	  <div id="loader" class="loader hidden ml-2"></div>
+	</button>
+      </div>
+      <p class="text-xs text-gray-500 mt-1">例: 401307 (福岡市の場合)</p>
+    </div>
+
+    <!-- Step 3: Dataset Selection -->
+    <div>
+      <label for="resourceSelect" class="block text-sm font-semibold text-gray-700 mb-1">3. 人口データセットを選択</label>
+      <select id="resourceSelect" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" disabled>
+	<option>先にCKANサイトのURLを入力してください</option>
+      </select>
+      <p id="searchStatus" class="text-sm text-gray-500 mt-1 h-5"></p>
+    </div>
+
+    <!-- Step 4: Filters (Conditional) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div id="dateFilterContainer" class="hidden">
+	<label for="dateSelect" class="block text-sm font-semibold text-gray-700 mb-1">4. 調査年月日を選択</label>
+	<select id="dateSelect" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+      </div>
+      <div id="areaFilterContainer" class="hidden">
+	<label for="areaSelect" class="block text-sm font-semibold text-gray-700 mb-1">5. エリアを選択</label>
+	<select id="areaSelect" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+      </div>
+    </div>
+
+    <!-- Step 6: Visualization Preview -->
+    <div class="bg-gray-50 p-4 rounded-lg">
+      <h3 class="text-lg font-semibold mb-2 text-center">6. プレビュー</h3>
+      <div id="chartContainer" class="relative min-h-[400px]">
+	<canvas id="pyramidChart"></canvas>
+	<div id="chartPlaceholder" class="absolute inset-0 flex items-center justify-center text-gray-500">
+	  データを選択するとここにグラフが表示されます
+	</div>
+      </div>
+    </div>
+
+    <!-- Step 7: Generated HTML Code -->
+    <div>
+      <h3 class="text-lg font-semibold mb-2">7. 埋め込み用HTMLコード (動的フィルタ付き)</h3>
+      <p class="text-sm text-gray-600 mb-2">下のコードをコピーして、GoogleサイトなどのHTML埋め込み機能に貼り付けてください。</p>
+      <textarea id="generatedHtml" class="w-full h-48 p-2 border border-gray-300 rounded-md bg-gray-900 text-gray-200 font-mono text-xs" readonly>ここにコードが生成されます</textarea>
+      <button id="copyBtn" class="mt-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">コードをコピー</button>
+    </div>
+  </div>
+</div>
+
+<!-- Error Modal -->
+<div id="errorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+  <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+    <div class="mt-3 text-center">
+      <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+	<svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+	  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+	</svg>
+      </div>
+      <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">エラー</h3>
+      <div class="mt-2 px-7 py-3">
+	<p id="errorMessage" class="text-sm text-gray-500"></p>
+      </div>
+      <div class="items-center px-4 py-3">
+	<button id="closeErrorModalBtn" class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300">
+	  閉じる
+	</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+  // --- DOM Elements ---
+  const dom = {
+      ckanUrl: document.getElementById('ckanUrl'),
+      orgId: document.getElementById('orgId'),
+      fetchBtn: document.getElementById('fetchDatasetsBtn'),
+      btnText: document.getElementById('btnText'),
+      loader: document.getElementById('loader'),
+      resourceSelect: document.getElementById('resourceSelect'),
+      searchStatus: document.getElementById('searchStatus'),
+      dateFilterContainer: document.getElementById('dateFilterContainer'),
+      dateSelect: document.getElementById('dateSelect'),
+      areaFilterContainer: document.getElementById('areaFilterContainer'),
+      areaSelect: document.getElementById('areaSelect'),
+      chartContainer: document.getElementById('chartContainer'),
+      chartCanvas: document.getElementById('pyramidChart'),
+      chartPlaceholder: document.getElementById('chartPlaceholder'),
+      generatedHtml: document.getElementById('generatedHtml'),
+      copyBtn: document.getElementById('copyBtn'),
+      errorModal: document.getElementById('errorModal'),
+      errorMessage: document.getElementById('errorMessage'),
+      closeErrorModalBtn: document.getElementById('closeErrorModalBtn'),
+  };
+
+  // --- Application State ---
+  let chartInstance = null;
+  let allResources = [];
+  let currentRecords = [];
+  let areaColumnKey = null;
+  let dateColumnKey = null;
+
+  // --- Initialization ---
+  document.addEventListener('DOMContentLoaded', () => {
+      dom.fetchBtn.addEventListener('click', onFetchClick);
+      dom.resourceSelect.addEventListener('change', onResourceSelect);
+      dom.dateSelect.addEventListener('change', onFilterChange);
+      dom.areaSelect.addEventListener('change', onFilterChange);
+      dom.copyBtn.addEventListener('click', copyToClipboard);
+      dom.closeErrorModalBtn.addEventListener('click', hideError);
+  });
+
+  // --- UI Update Functions ---
+  const ui = {
+      setLoading(isLoading, text = 'データセット取得') {
+          dom.fetchBtn.disabled = isLoading;
+          dom.loader.classList.toggle('hidden', !isLoading);
+          dom.btnText.textContent = text;
+      },
+      updateSearchStatus(message) {
+          dom.searchStatus.textContent = message;
+      },
+      updateResourceSelect(resources) {
+          dom.resourceSelect.innerHTML = '';
+          if (resources.length > 0) {
+              dom.resourceSelect.disabled = false;
+              const defaultOption = new Option('データセットを選択してください', '');
+              dom.resourceSelect.add(defaultOption);
+              resources.forEach((res, index) => {
+                  const option = new Option(res.name, index);
+                  dom.resourceSelect.add(option);
+              });
+          } else {
+              dom.resourceSelect.disabled = true;
+              const option = new Option('CSV形式のデータが見つかりません', '');
+              dom.resourceSelect.add(option);
+          }
+      },
+      showChartPlaceholder(message) {
+          dom.chartPlaceholder.textContent = message;
+          dom.chartPlaceholder.style.display = 'flex';
+          if (chartInstance) {
+              chartInstance.destroy();
+              chartInstance = null;
+          }
+      },
+      renderChart(data) {
+          dom.chartPlaceholder.style.display = 'none';
+          if (chartInstance) chartInstance.destroy();
+
+          chartInstance = new Chart(dom.chartCanvas.getContext('2d'), {
+              type: 'bar',
+              data: {
+                  labels: data.labels,
+                  datasets: [
+                      { label: '男性', data: data.maleData, backgroundColor: 'rgba(54, 162, 235, 0.8)' },
+                      { label: '女性', data: data.femaleData, backgroundColor: 'rgba(255, 99, 132, 0.8)' }
+                  ]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  indexAxis: 'y',
+                  scales: {
+                      x: { stacked: true, ticks: { callback: v => Math.abs(v).toLocaleString() }, title: { display: true, text: '人口（人）' } },
+                      y: { stacked: true, beginAtZero: true, title: { display: true, text: '年齢階級' } }
+                  },
+                  plugins: {
+                      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${Math.abs(ctx.raw).toLocaleString()}人` } },
+                      legend: { position: 'top' }
+                  }
+              }
+          });
+      },
+      updateAreaFilter(key, areas) {
+          areaColumnKey = key;
+          dom.areaSelect.innerHTML = '';
+          if (key && areas.length > 1) {
+              dom.areaFilterContainer.classList.remove('hidden');
+              dom.areaSelect.add(new Option('全体', 'overall'));
+              areas.forEach(area => dom.areaSelect.add(new Option(area, area)));
+          } else {
+              dom.areaFilterContainer.classList.add('hidden');
+          }
+      },
+      updateDateFilter(key, dates) {
+          dateColumnKey = key;
+          dom.dateSelect.innerHTML = '';
+          if (key && dates.length > 0) {
+              dom.dateFilterContainer.classList.remove('hidden');
+              dates.sort((a, b) => b.localeCompare(a));
+              dates.forEach(date => dom.dateSelect.add(new Option(date, date)));
+          } else {
+              dom.dateFilterContainer.classList.add('hidden');
+          }
+      }
+  };
+
+  // --- Error Handling ---
+  function showError(message) {
+      console.error(message);
+      dom.errorMessage.textContent = message;
+      dom.errorModal.classList.remove('hidden');
+  }
+
+  function hideError() {
+      dom.errorModal.classList.add('hidden');
+  }
+
+  // --- Event Handlers ---
+  async function onFetchClick() {
+      const baseUrl = dom.ckanUrl.value.trim().replace(/\/$/, '');
+      const orgId = dom.orgId.value.trim();
+      if (!baseUrl) {
+          showError('CKANサイトのURLを入力してください。');
+          return;
+      }
+
+      ui.setLoading(true, '検索中...');
+      let statusMsg = orgId ? `組織 (${orgId}) 内で検索しています...` : 'データセットを検索しています...';
+      ui.updateSearchStatus(statusMsg);
+      ui.updateResourceSelect([]);
+      ui.updateAreaFilter(null, []);
+      ui.updateDateFilter(null, []);
+
+      try {
+          const packages = await api.searchPackages(baseUrl, orgId);
+          if (packages.length === 0) {
+              ui.updateSearchStatus('指定された条件で人口関連のデータセットが見つかりませんでした。');
+              return;
+          }
+
+          allResources = packages.flatMap(pkg =>
+              pkg.resources
+                  .filter(res => res.format && res.format.toLowerCase().includes('csv'))
+                  .map(res => ({ id: res.id, name: `${pkg.title} / ${res.name}` }))
+          );
+
+          ui.updateResourceSelect(allResources);
+          ui.updateSearchStatus(allResources.length > 0
+				? `${allResources.length}件のCSVリソースが見つかりました。`
+				: '人口関連データセット内にCSV形式のリソースが見つかりませんでした。');
+
+      } catch (error) {
+          showError(`データセットの取得に失敗しました: ${error.message}`);
+          ui.updateSearchStatus('取得エラー');
+      } finally {
+          ui.setLoading(false);
+      }
+  }
+
+  async function onResourceSelect() {
+      const selectedIndex = dom.resourceSelect.value;
+      ui.updateAreaFilter(null, []);
+      ui.updateDateFilter(null, []);
+      if (!selectedIndex) {
+          ui.showChartPlaceholder('データを選択するとここにグラフが表示されます');
+          return;
+      }
+
+      const resource = allResources[parseInt(selectedIndex, 10)];
+      ui.setLoading(true, '生成中...');
+      ui.showChartPlaceholder('グラフを生成しています...');
+
+      try {
+          currentRecords = await api.fetchResourceData(dom.ckanUrl.value, resource.id);
+
+          const { key: dateKey, dates } = dataProcessor.detectDate(currentRecords);
+          ui.updateDateFilter(dateKey, dates);
+
+          const { key: areaKey, areas } = dataProcessor.detectArea(currentRecords);
+          ui.updateAreaFilter(areaKey, areas);
+
+          renderFilteredChart();
+      } catch (error) {
+          showError(error.message);
+          ui.showChartPlaceholder('データの処理中にエラーが発生しました。');
+      } finally {
+          ui.setLoading(false);
+      }
+  }
+
+  function onFilterChange() {
+      renderFilteredChart();
+  }
+
+  function renderFilteredChart() {
+      const selectedDate = dom.dateSelect.value;
+      const selectedArea = dom.areaSelect.value;
+      let recordsForPreview = currentRecords;
+
+      if (dateColumnKey && selectedDate) {
+          recordsForPreview = recordsForPreview.filter(r => r[dateColumnKey] === selectedDate);
+      }
+      if (areaColumnKey && selectedArea && selectedArea !== 'overall') {
+          recordsForPreview = recordsForPreview.filter(r => r[areaColumnKey] === selectedArea);
+      }
+
+      try {
+          const processedData = dataProcessor.process(recordsForPreview);
+          if (processedData.labels.length > 0) {
+              // Render preview chart
+              ui.renderChart(processedData);
+
+              // Generate dynamic embeddable HTML
+              const resourceName = allResources[parseInt(dom.resourceSelect.value, 10)].name;
+              const dateInfo = { key: dateColumnKey, dates: dataProcessor.detectDate(currentRecords).dates };
+              const areaInfo = { key: areaColumnKey, areas: dataProcessor.detectArea(currentRecords).areas };
+
+              const html = htmlGenerator.create(currentRecords, resourceName, dateInfo, areaInfo);
+              dom.generatedHtml.value = html;
+
+          } else {
+              throw new Error('選択された条件に、認識可能な人口データが含まれていないようです。');
+          }
+      } catch (error) {
+          showError(error.message);
+          ui.showChartPlaceholder(error.message);
+      }
+  }
+
+
+  // --- API Layer ---
+  const api = {
+      async _fetchWithProxy(url) {
+          const proxies = ['https://api.allorigins.win/raw?url=', 'https://corsproxy.io/?'];
+          for (const proxy of proxies) {
+              try {
+                  const response = await fetch(proxy + encodeURIComponent(url));
+                  if (response.ok) return response.json();
+              } catch (e) {
+                  console.warn(`Proxy ${proxy} failed. Trying next one...`);
+              }
+          }
+          throw new Error('All CORS proxies failed.');
+      },
+      async searchPackages(baseUrl, orgId) {
+          const searchTerms = ['jinko', 'population', '人口', '年齢', '男女別', '地域', '校区', '区'];
+          for (const term of searchTerms) {
+              let searchUrl = `${baseUrl}/api/3/action/package_search?q=${term}&rows=100`;
+              if (orgId) {
+                  searchUrl += `&fq=organization:${encodeURIComponent(orgId)}`;
+              }
+              const data = await this._fetchWithProxy(searchUrl);
+              if (data.success && data.result.results.length > 0) {
+                  return data.result.results;
+              }
+          }
+          return [];
+      },
+      async fetchResourceData(baseUrl, resourceId) {
+          const apiUrl = `${baseUrl.trim().replace(/\/$/, '')}/api/3/action/datastore_search?resource_id=${resourceId}&limit=10000`;
+          const data = await this._fetchWithProxy(apiUrl);
+          if (!data.success) throw new Error('DataStore API returned an error: ' + JSON.stringify(data.error));
+          return data.result.records;
+      }
+  };
+
+  // --- Data Processing Layer ---
+  const dataProcessor = {
+      detectArea(records) {
+          if (!records || records.length === 0) return { key: null, areas: [] };
+          const areaCandidates = ['地域名', '校区名', '区名', '行政区', '行政区名', '市区町村名', 'area', 'region'];
+          const keys = Object.keys(records[0]);
+          const key = areaCandidates.find(c => keys.some(k => k.toLowerCase() === c.toLowerCase()));
+          if (!key) return { key: null, areas: [] };
+          const areas = [...new Set(records.map(r => r[key]).filter(Boolean))].sort();
+          return { key, areas };
+      },
+      detectDate(records) {
+          if (!records || records.length === 0) return { key: null, dates: [] };
+          const dateCandidates = ['調査年月日', '時点', 'year', 'time', 'date', 'time_code', '年度'];
+          const keys = Object.keys(records[0]);
+          const key = dateCandidates.find(c => keys.some(k => k.toLowerCase().replace(/_/g, '') === c.toLowerCase()));
+          if (!key) return { key: null, dates: [] };
+          const dates = [...new Set(records.map(r => r[key]).filter(Boolean))].sort();
+          return { key, dates };
+      },
+      process(records) {
+          if (!records || records.length === 0) return { labels: [], maleData: [], femaleData: [] };
+          const keys = Object.keys(records[0]);
+          const isWideFormat = keys.some(key => /^\d+.*(男|女|male|female)/i.test(key));
+          return isWideFormat ? this._processWide(records) : this._processLong(records);
+      },
+      _processWide(records) {
+          const ageGroups = new Map();
+          records.forEach(dataRow => {
+              for (const key in dataRow) {
+                  const ageMatch = key.match(/^(\d+歳?以上|\d+-\d+歳|\d+歳)/);
+                  if (ageMatch) {
+                      const ageLabel = ageMatch[1].replace(/歳/g, '');
+                      const value = parseInt(String(dataRow[key]).replace(/,/g, ''), 10);
+                      if (isNaN(value)) continue;
+                      if (!ageGroups.has(ageLabel)) ageGroups.set(ageLabel, { male: 0, female: 0 });
+                      const group = ageGroups.get(ageLabel);
+                      if (/男|male/i.test(key)) group.male += value;
+                      else if (/女|female/i.test(key)) group.female += value;
+                  }
+              }
+          });
+          const sorted = [...ageGroups.entries()].sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10));
+
+          const labels = sorted.map(([label]) => label.replace('以上', '歳以上'));
+          const maleData = sorted.map(([, data]) => -data.male);
+          const femaleData = sorted.map(([, data]) => data.female);
+
+          // Reverse arrays for bottom-to-top age progression
+          labels.reverse();
+          maleData.reverse();
+          femaleData.reverse();
+
+          return { labels, maleData, femaleData };
+      },
+      _processLong(records) {
+          const findKey = (keys, candidates) => candidates.find(c => keys.some(k => k.toLowerCase() === c.toLowerCase()));
+          const keys = Object.keys(records[0]);
+          const ageKey = findKey(keys, ['年齢', '年齢（各歳）', '年齢階級', '年齢５歳階級', 'age']);
+          const maleKey = findKey(keys, ['男性人口', '男', '男性', 'male']);
+          const femaleKey = findKey(keys, ['女性人口', '女', '女性', 'female']);
+          if (!ageKey || !maleKey || !femaleKey) return { labels: [], maleData: [], femaleData: [] };
+          const sorted = records
+                .map(rec => ({ ...rec, _sortAge: parseInt(String(rec[ageKey]).match(/^\d+/)?.[0] ?? 999, 10) }))
+                .sort((a, b) => a._sortAge - b._sortAge);
+          const result = { labels: [], maleData: [], femaleData: [] };
+          sorted.forEach(rec => {
+              const ageLabel = String(rec[ageKey]);
+              if (/総|合計|不詳/i.test(ageLabel)) return;
+              const maleValue = parseInt(String(rec[maleKey]).replace(/,/g, ''), 10);
+              const femaleValue = parseInt(String(rec[femaleKey]).replace(/,/g, ''), 10);
+              if (!isNaN(maleValue) && !isNaN(femaleValue)) {
+                  result.labels.push(ageLabel);
+                  result.maleData.push(-maleValue);
+                  result.femaleData.push(femaleValue);
+              }
+          });
+
+          // Reverse arrays for bottom-to-top age progression
+          result.labels.reverse();
+          result.maleData.reverse();
+          result.femaleData.reverse();
+
+          return result;
+      }
+  };
+
+  // --- HTML Generator ---
+  const htmlGenerator = {
+      create(rawRecords, baseTitle, dateInfo, areaInfo) {
+          const sanitizedTitle = baseTitle.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	  const config = {
+	      records: rawRecords,
+	      baseTitle: baseTitle,
+	      dateKey: dateInfo.key,
+	      areaKey: areaInfo.key,
+	      dates: dateInfo.dates,
+	      areas: areaInfo.areas
+	  };
+	  const configJson = JSON.stringify(config).replace(/</g, '\\u003c');
+
+	  const embeddedScript = `
+	      const config = ${configJson};
+	          let chartInstance = null;
+		      const chartCanvas = document.getElementById('embedPyramidChart');
+		          const dateSelect = document.getElementById('date-select');
+			      const areaSelect = document.getElementById('area-select');
+			          const chartTitleEl = document.getElementById('chartTitle');
+
+				      const dataProcessor = {
+				              process(records) {
+					                  if (!records || records.length === 0) return { labels: [], maleData: [], femaleData: [] };
+							              const keys = Object.keys(records[0]);
+								                  const isWideFormat = keys.some(key => /^\\d+.*(男|女|male|female)/i.test(key));
+										              return isWideFormat ? this._processWide(records) : this._processLong(records);
+											              },
+												              _processWide(records) {
+													                  const ageGroups = new Map();
+															              records.forEach(dataRow => {
+																                      for (const key in dataRow) {
+																		                          const ageMatch = key.match(/^(\\d+歳?以上|\\d+-\\d+歳|\\d+歳)/);
+                      if (ageMatch) {
+                          const ageLabel = ageMatch[1].replace(/歳/g, '');
+                          const value = parseInt(String(dataRow[key]).replace(/,/g, ''), 10);
+                          if (isNaN(value)) continue;
+                          if (!ageGroups.has(ageLabel)) ageGroups.set(ageLabel, { male: 0, female: 0 });
+                          const group = ageGroups.get(ageLabel);
+                          if (/男|male/i.test(key)) group.male += value;
+                          else if (/女|female/i.test(key)) group.female += value;
+                      }
+                  }
+              });
+              const sorted = [...ageGroups.entries()].sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10));
+
+              const labels = sorted.map(([label]) => label.replace('以上', '歳以上'));
+              const maleData = sorted.map(([, data]) => -data.male);
+              const femaleData = sorted.map(([, data]) => data.female);
+
+              // Reverse arrays for bottom-to-top age progression
+              labels.reverse();
+              maleData.reverse();
+              femaleData.reverse();
+
+              return { labels, maleData, femaleData };
+          },
+          _processLong(records) {
+              const findKey = (keys, candidates) => candidates.find(c => keys.some(k => k.toLowerCase() === c.toLowerCase()));
+              const keys = Object.keys(records[0]);
+              const ageKey = findKey(keys, ['年齢', '年齢（各歳）', '年齢階級', '年齢５歳階級', 'age']);
+              const maleKey = findKey(keys, ['男性人口', '男', '男性', 'male']);
+              const femaleKey = findKey(keys, ['女性人口', '女', '女性', 'female']);
+              if (!ageKey || !maleKey || !femaleKey) return { labels: [], maleData: [], femaleData: [] };
+              const sorted = records
+                  .map(rec => ({ ...rec, _sortAge: parseInt(String(rec[ageKey]).match(/^\\d+/)?.[0] ?? 999, 10) }))
+                  .sort((a, b) => a._sortAge - b._sortAge);
+              const result = { labels: [], maleData: [], femaleData: [] };
+              sorted.forEach(rec => {
+                  const ageLabel = String(rec[ageKey]);
+                  if (/総|合計|不詳/i.test(ageLabel)) return;
+                  const maleValue = parseInt(String(rec[maleKey]).replace(/,/g, ''), 10);
+                  const femaleValue = parseInt(String(rec[femaleKey]).replace(/,/g, ''), 10);
+                  if (!isNaN(maleValue) && !isNaN(femaleValue)) {
+                      result.labels.push(ageLabel);
+                      result.maleData.push(-maleValue);
+                      result.femaleData.push(femaleValue);
+                  }
+              });
+
+              // Reverse arrays for bottom-to-top age progression
+              result.labels.reverse();
+              result.maleData.reverse();
+              result.femaleData.reverse();
+
+              return result;
+          }
+      };
+
+      function renderChart() {
+          const selectedDate = config.dateKey ? dateSelect.value : null;
+          const selectedArea = config.areaKey ? areaSelect.value : null;
+
+          let recordsToProcess = config.records;
+          if (selectedDate) {
+              recordsToProcess = recordsToProcess.filter(r => r[config.dateKey] === selectedDate);
+          }
+          if (selectedArea && selectedArea !== 'overall') {
+              recordsToProcess = recordsToProcess.filter(r => r[config.areaKey] === selectedArea);
+          }
+
+          const processedData = dataProcessor.process(recordsToProcess);
+
+          let title = config.baseTitle;
+          if (selectedDate) title += \` (\${selectedDate})\`;
+          if (selectedArea && selectedArea !== 'overall') title += \` [\${selectedArea}]\`;
+          chartTitleEl.textContent = title;
+
+          if (chartInstance) {
+              chartInstance.data.labels = processedData.labels;
+              chartInstance.data.datasets[0].data = processedData.maleData;
+              chartInstance.data.datasets[1].data = processedData.femaleData;
+              chartInstance.update();
+          } else {
+              chartInstance = new Chart(chartCanvas, {
+                  type: 'bar',
+                  data: {
+                      labels: processedData.labels,
+                      datasets: [
+                          { label: '男性', data: processedData.maleData, backgroundColor: 'rgba(54, 162, 235, 0.8)' },
+                          { label: '女性', data: processedData.femaleData, backgroundColor: 'rgba(255, 99, 132, 0.8)' }
+                      ]
+                  },
+                  options: {
+                      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                      scales: {
+                          x: { stacked: true, ticks: { callback: v => Math.abs(v).toLocaleString() }, title: { display: true, text: '人口（人）' } },
+                          y: { stacked: true, beginAtZero: true, title: { display: true, text: '年齢階級' } }
+                      },
+                      plugins: {
+                          tooltip: { callbacks: { label: ctx => \`\${ctx.dataset.label}: \${Math.abs(ctx.raw).toLocaleString()}人\` } },
+                          legend: { position: 'top' }
+                      }
+                  }
+              });
+          }
+      }
+
+      function initialize() {
+          if (config.dateKey && config.dates && config.dates.length > 0) {
+              document.getElementById('date-filter-wrapper').style.display = 'flex';
+              config.dates.sort((a, b) => b.localeCompare(a));
+              config.dates.forEach(date => dateSelect.add(new Option(date, date)));
+              dateSelect.addEventListener('change', renderChart);
+          }
+          if (config.areaKey && config.areas && config.areas.length > 1) {
+              document.getElementById('area-filter-wrapper').style.display = 'flex';
+              areaSelect.add(new Option('全体', 'overall'));
+              config.areas.forEach(area => areaSelect.add(new Option(area, area)));
+              areaSelect.addEventListener('change', renderChart);
+          }
+          renderChart();
+      }
+
+      initialize();
+      `;
+
+          return `
+  <!DOCTYPE html>
+  <html lang="ja">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>人口ピラミッド: ${sanitizedTitle}</title>
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
+      <style>
+          body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; margin: 0; background-color: #f9fafb; padding: 1rem; box-sizing: border-box; }
+          #chartTitle { font-size: 1.25rem; margin-bottom: 1rem; color: #111827; text-align: center; }
+          .chart-container { position: relative; flex-grow: 1; width: 100%; max-width: 1200px; padding: 20px; background-color: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+          .filters { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; justify-content: center; }
+          .filters > div { display: flex; align-items: center; gap: 0.5rem; }
+          .filters select { padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; background-color: white; }
+      </style>
+  </head>
+  <body>
+      <h1 id="chartTitle">${sanitizedTitle}</h1>
+      <div class="filters">
+          <div id="date-filter-wrapper" style="display: none;">
+              <label for="date-select">調査年月日:</label>
+              <select id="date-select"></select>
+          </div>
+          <div id="area-filter-wrapper" style="display: none;">
+              <label for="area-select">エリア:</label>
+              <select id="area-select"></select>
+          </div>
+      </div>
+      <div class="chart-container">
+          <canvas id="embedPyramidChart"></canvas>
+      </div>
+      <script>
+          ${embeddedScript}
+      <\/script>
+  </body>
+  </html>`;
+      }
+  };
+
+  // --- Utility Functions ---
+  async function copyToClipboard() {
+      const code = dom.generatedHtml.value;
+      if (!code || code === 'ここにコードが生成されます') {
+          showError('コピーするコードがありません。まずグラフを生成してください。');
+	  return;
+      }
+      try {
+          await navigator.clipboard.writeText(code);
+	  dom.copyBtn.textContent = 'コピーしました！';
+      } catch (err) {
+          dom.generatedHtml.select();
+	  document.execCommand('copy');
+	  dom.copyBtn.textContent = 'コピーしました！(Fallback)';
+      } finally {
+          setTimeout(() => { dom.copyBtn.textContent = 'コードをコピー'; }, 2000);
+      }
+  }
+  </script>
+</body>
+</html>

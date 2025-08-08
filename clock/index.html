@@ -1,0 +1,380 @@
+xt-white">HTML時計ジェネレーター</h1>
+
+<div class="space-y-6">
+  <!-- 表示要素 -->
+  <div>
+    <h2 class="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">表示要素</h2>
+    <div class="space-y-3">
+      <label class="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+	<span class="text-sm font-medium text-gray-700 dark:text-gray-300">アナログ時計</span>
+	<input type="checkbox" id="showAnalog" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-200 dark:bg-gray-600 border-gray-300 dark:border-gray-500 rounded focus:ring-blue-500" checked>
+      </label>
+      <label class="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+	<span class="text-sm font-medium text-gray-700 dark:text-gray-300">日付 (年月日)</span>
+	<input type="checkbox" id="showDate" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-200 dark:bg-gray-600 border-gray-300 dark:border-gray-500 rounded focus:ring-blue-500" checked>
+      </label>
+      <label class="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+	<span class="text-sm font-medium text-gray-700 dark:text-gray-300">デジタル時計</span>
+	<input type="checkbox" id="showDigital" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-200 dark:bg-gray-600 border-gray-300 dark:border-gray-500 rounded focus:ring-blue-500" checked>
+      </label>
+    </div>
+  </div>
+
+  <!-- デザイン設定 -->
+  <div>
+    <h2 class="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">デザイン設定</h2>
+    <div class="space-y-4">
+      <div class="flex items-center justify-between">
+	<label for="bgColor" class="control-label">背景色</label>
+	<select id="bgColor" class="color-select"></select>
+      </div>
+      <div id="analogControlsContainer" class="space-y-4">
+	<div class="flex items-center justify-between">
+	  <label for="analogStyle" class="control-label">アナログ時計のスタイル</label>
+	  <select id="analogStyle" class="color-select">
+	    <option value="classic" selected>クラシック</option>
+	    <option value="minimal">ミニマル</option>
+	  </select>
+	</div>
+	<label class="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+	  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">アナログ時計の色を反転</span>
+	  <input type="checkbox" id="invertAnalog" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-200 dark:bg-gray-600 border-gray-300 dark:border-gray-500 rounded focus:ring-blue-500">
+	</label>
+      </div>
+      <div id="dateColorContainer" class="flex items-center justify-between">
+	<label for="dateColor" class="control-label">日付の文字色</label>
+	<select id="dateColor" class="color-select"></select>
+      </div>
+      <div id="digitalColorContainer" class="flex items-center justify-between">
+	<label for="digitalColor" class="control-label">デジタル時計の文字色</label>
+	<select id="digitalColor" class="color-select"></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 生成コード -->
+  <div>
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">生成コード</h2>
+      <button id="copyButton" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-green-500 disabled:cursor-not-allowed">
+	コピー
+      </button>
+    </div>
+    <textarea id="generatedCode" readonly class="w-full h-64 p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-900 font-mono text-xs"></textarea>
+  </div>
+</div>
+</aside>
+
+<!-- ===== プレビュー ===== -->
+<main class="w-full lg:w-2/3 xl:w-3/4 bg-gray-200 dark:bg-gray-900">
+  <iframe id="preview" class="w-full h-full border-none"></iframe>
+</main>
+</div>
+
+<script>
+  // === 定数定義 ===
+  const COLORS = {
+      bg: [
+          { name: '白', value: 'bg-white' },
+          { name: '黒', value: 'bg-black' },
+          { name: '薄いグレー', value: 'bg-gray-100' },
+          { name: '濃いグレー', value: 'bg-gray-800' },
+      ],
+      text: [
+          { name: '黒', value: 'text-black', hex: '#000000' },
+          { name: '白', value: 'text-white', hex: '#FFFFFF' },
+          { name: 'グレー', value: 'text-gray-500 dark:text-gray-400', hex: '#6b7280' },
+          { name: '赤', value: 'text-red-600 dark:text-red-400', hex: '#dc2626' },
+          { name: '青', value: 'text-blue-600 dark:text-blue-400', hex: '#2563eb' },
+          { name: '緑', value: 'text-green-600 dark:text-green-400', hex: '#16a34a' },
+      ]
+  };
+
+  // === DOM要素の取得 ===
+  const controls = {
+      showAnalog: document.getElementById('showAnalog'),
+      showDate: document.getElementById('showDate'),
+      showDigital: document.getElementById('showDigital'),
+      bgColor: document.getElementById('bgColor'),
+      analogStyle: document.getElementById('analogStyle'),
+      invertAnalog: document.getElementById('invertAnalog'),
+      dateColor: document.getElementById('dateColor'),
+      digitalColor: document.getElementById('digitalColor'),
+      analogControlsContainer: document.getElementById('analogControlsContainer'),
+      dateColorContainer: document.getElementById('dateColorContainer'),
+      digitalColorContainer: document.getElementById('digitalColorContainer'),
+      generatedCode: document.getElementById('generatedCode'),
+      preview: document.getElementById('preview'),
+      copyButton: document.getElementById('copyButton'),
+  };
+
+  // === 初期化処理 ===
+  function initialize() {
+      function populateColorSelect(element, colorList, defaultValue, applyColor) {
+          colorList.forEach(color => {
+              const option = document.createElement('option');
+              option.value = color.value;
+              option.textContent = color.name;
+              if (applyColor && color.hex) {
+                  if (color.name === '白') {
+                      option.style.color = '#000000';
+                  } else {
+                      option.style.color = color.hex;
+                  }
+              }
+              element.appendChild(option);
+          });
+          element.value = defaultValue;
+      }
+      populateColorSelect(controls.bgColor, COLORS.bg, 'bg-white', false);
+      populateColorSelect(controls.dateColor, COLORS.text, 'text-gray-500 dark:text-gray-400', true);
+      populateColorSelect(controls.digitalColor, COLORS.text, 'text-black', true);
+
+      Object.keys(controls).forEach(key => {
+          if (controls[key].tagName === 'INPUT' || controls[key].tagName === 'SELECT') {
+              controls[key].addEventListener('change', updateGenerator);
+          }
+      });
+
+      controls.copyButton.addEventListener('click', () => {
+          controls.generatedCode.select();
+          document.execCommand('copy');
+          const originalText = controls.copyButton.textContent;
+          controls.copyButton.textContent = 'コピーしました！';
+          controls.copyButton.disabled = true;
+          setTimeout(() => {
+              controls.copyButton.textContent = originalText;
+              controls.copyButton.disabled = false;
+          }, 2000);
+      });
+
+      updateGenerator();
+  }
+
+  // === ジェネレーターのメインロジック ===
+
+  function generateHtml() {
+      const settings = {
+          showAnalog: controls.showAnalog.checked,
+          showDate: controls.showDate.checked,
+          showDigital: controls.showDigital.checked,
+          bgColorClass: controls.bgColor.value,
+          analogStyle: controls.analogStyle.value,
+          invertAnalog: controls.invertAnalog.checked,
+          dateColorClass: controls.dateColor.value,
+          digitalColorClass: controls.digitalColor.value,
+      };
+
+      controls.analogControlsContainer.style.display = settings.showAnalog ? 'block' : 'none';
+      controls.dateColorContainer.style.display = settings.showDate ? 'flex' : 'none';
+      controls.digitalColorContainer.style.display = settings.showDigital ? 'flex' : 'none';
+
+      const analogClockHtml = settings.showAnalog ? `
+          <!-- アナログ時計 -->
+          <div class="w-full h-full bg-white dark:bg-gray-800 rounded-full shadow-2xl border-4 border-gray-200 dark:border-gray-700">
+              <canvas id="analog-clock-canvas"></canvas>
+          </div>` : '';
+
+      const dateHtml = settings.showDate ? `
+          <!-- 日付 -->
+          <div id="date-display" class="mt-6 text-xl sm:text-2xl md:text-3xl font-medium ${settings.dateColorClass}"></div>` : '';
+
+      const digitalClockHtml = settings.showDigital ? `
+          <!-- デジタル時計 -->
+          <div id="digital-clock" class="mt-2 text-4xl sm:text-5xl md:text-6xl font-semibold tracking-wider ${settings.digitalColorClass}"></div>` : '';
+
+      const script = generateScript(settings);
+
+      return `<!DOCTYPE html>
+  <html lang="ja">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>生成された時計</title>
+      <script src="https://cdn.tailwindcss.com/"><\/script>
+      <style>
+          body { font-family: 'Inter', 'Noto Sans JP', sans-serif; }
+          canvas { width: 100%; height: 100%; display: block; }
+      </style>
+  </head>
+  <body class="flex items-center justify-center min-h-screen p-4 ${settings.bgColorClass}">
+      <div class="w-full max-w-sm md:max-w-md aspect-square flex flex-col items-center justify-center">
+          ${analogClockHtml}
+          ${dateHtml}
+          ${digitalClockHtml}
+      </div>
+      <script>
+          ${script}
+      <\/script>
+  </body>
+  </html>`;
+  }
+
+  function generateScript(settings) {
+      if (!settings.showAnalog && !settings.showDate && !settings.showDigital) {
+          return `// 表示する要素が選択されていません。`;
+      }
+
+      const getAnalogColor = (lightColor, darkColor, inverted) => {
+          return (isDarkMode) => inverted
+              ? (isDarkMode ? lightColor : darkColor)
+              : (isDarkMode ? darkColor : lightColor);
+      };
+
+      const classicAnalogFunctions = {
+          drawFace: `
+                  const faceColor = getAnalogColor('white', '#1f2937', ${settings.invertAnalog})(isDarkMode);
+                  const centerDotColor = getAnalogColor('#333', '#f3f4f6', ${settings.invertAnalog})(isDarkMode);
+
+                  ctx.beginPath(); ctx.arc(0, 0, radius, 0, 2 * Math.PI);
+                  ctx.fillStyle = faceColor; ctx.fill();
+                  const grad = ctx.createRadialGradient(0, 0, radius * 0.95, 0, 0, radius * 1.05);
+                  const gradColors = {
+                      light: ['#e2e8f0', 'white', '#e2e8f0'],
+                      dark: ['#374151', '#1f2937', '#374151']
+                  };
+                  const finalGradColors = getAnalogColor(gradColors.light, gradColors.dark, ${settings.invertAnalog})(isDarkMode);
+                  grad.addColorStop(0, finalGradColors[0]); grad.addColorStop(0.5, finalGradColors[1]); grad.addColorStop(1, finalGradColors[2]);
+                  ctx.strokeStyle = grad; ctx.lineWidth = radius * 0.1; ctx.stroke();
+                  ctx.beginPath(); ctx.arc(0, 0, radius * 0.05, 0, 2 * Math.PI);
+                  ctx.fillStyle = centerDotColor; ctx.fill();`,
+          drawNumbers: `
+                  ctx.fillStyle = getAnalogColor('#333', '#d1d5db', ${settings.invertAnalog})(isDarkMode);
+                  ctx.font = radius * 0.15 + "px sans-serif";
+                  ctx.textBaseline = "middle"; ctx.textAlign = "center";
+                  for (let num = 1; num <= 12; num++) {
+                      const ang = num * Math.PI / 6;
+                      ctx.rotate(ang); ctx.translate(0, -radius * 0.85); ctx.rotate(-ang);
+                      ctx.fillText(num.toString(), 0, 0);
+                      ctx.rotate(ang); ctx.translate(0, radius * 0.85); ctx.rotate(-ang);
+                  }`,
+          drawTicks: `
+                  const majorTickColor = getAnalogColor('#555', '#9ca3af', ${settings.invertAnalog})(isDarkMode);
+                  const minorTickColor = getAnalogColor('#aaa', '#6b7280', ${settings.invertAnalog})(isDarkMode);
+                  for (let i = 0; i < 60; i++) {
+                      const ang = i * Math.PI / 30;
+                      ctx.beginPath(); ctx.rotate(ang); ctx.moveTo(0, -radius * 0.95);
+                      if (i % 5 === 0) {
+                          ctx.lineWidth = radius * 0.03; ctx.lineTo(0, -radius * 0.88);
+                          ctx.strokeStyle = majorTickColor;
+                      } else {
+                          ctx.lineWidth = radius * 0.015; ctx.lineTo(0, -radius * 0.92);
+                          ctx.strokeStyle = minorTickColor;
+                      }
+                      ctx.stroke(); ctx.rotate(-ang);
+                  }`
+      };
+
+      const minimalAnalogFunctions = {
+          drawFace: `
+                  const faceColor = getAnalogColor('white', '#1f2937', ${settings.invertAnalog})(isDarkMode);
+                  const borderColor = getAnalogColor('#e2e8f0', '#4b5563', ${settings.invertAnalog})(isDarkMode);
+                  const centerDotColor = getAnalogColor('#333', '#f3f4f6', ${settings.invertAnalog})(isDarkMode);
+
+                  ctx.beginPath(); ctx.arc(0, 0, radius, 0, 2 * Math.PI);
+                  ctx.fillStyle = faceColor; ctx.fill();
+                  ctx.strokeStyle = borderColor;
+                  ctx.lineWidth = radius * 0.05; ctx.stroke();
+                  ctx.beginPath(); ctx.arc(0, 0, radius * 0.05, 0, 2 * Math.PI);
+                  ctx.fillStyle = centerDotColor; ctx.fill();`,
+          drawNumbers: `
+                  ctx.strokeStyle = getAnalogColor('#333', '#d1d5db', ${settings.invertAnalog})(isDarkMode);
+                  ctx.lineWidth = radius * 0.04;
+                  for (let num = 1; num <= 12; num++) {
+                      const ang = num * Math.PI / 6;
+                      ctx.rotate(ang); ctx.beginPath();
+                      ctx.moveTo(0, -radius * 0.8); ctx.lineTo(0, -radius * 0.9);
+                      ctx.stroke(); ctx.rotate(-ang);
+                  }`,
+          drawTicks: ``
+      };
+
+      const analogFunctions = settings.analogStyle === 'classic' ? classicAnalogFunctions : minimalAnalogFunctions;
+
+      return `
+  (function() {
+      const analogCanvas = ${settings.showAnalog ? `document.getElementById('analog-clock-canvas')` : 'null'};
+      const dateEl = ${settings.showDate ? `document.getElementById('date-display')` : 'null'};
+      const digitalEl = ${settings.showDigital ? `document.getElementById('digital-clock')` : 'null'};
+      const ctx = analogCanvas ? analogCanvas.getContext('2d') : null;
+      let radius;
+
+      const getAnalogColor = (lightColor, darkColor, inverted) => {
+          return (isDarkMode) => inverted
+              ? (isDarkMode ? lightColor : darkColor)
+              : (isDarkMode ? darkColor : lightColor);
+      };
+
+      function drawHand(pos, length, width, color) {
+          ctx.beginPath(); ctx.lineWidth = width; ctx.lineCap = "round";
+          ctx.moveTo(0, 0); ctx.rotate(pos); ctx.lineTo(0, -length);
+          ctx.strokeStyle = color; ctx.stroke(); ctx.rotate(-pos);
+      }
+
+      function updateClocks() {
+          const now = new Date();
+          const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+          const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (dateEl) {
+              const year = now.getFullYear(), month = (now.getMonth() + 1).toString().padStart(2, '0');
+              const date = now.getDate().toString().padStart(2, '0'), day = ["日", "月", "火", "水", "木", "金", "土"][now.getDay()];
+              dateEl.textContent = \`\${year}年\${month}月\${date}日 (\${day})\`;
+          }
+          if (digitalEl) {
+              const format = (n) => n.toString().padStart(2, '0');
+              digitalEl.textContent = \`\${format(h)}:\${format(m)}:\${format(s)}\`;
+          }
+          if (analogCanvas && ctx) {
+              ctx.clearRect(0, 0, analogCanvas.width, analogCanvas.height);
+              ctx.save();
+              ctx.translate(analogCanvas.width / 2, analogCanvas.height / 2);
+              ${settings.showAnalog ? analogFunctions.drawFace : ''}
+              ${settings.showAnalog ? analogFunctions.drawNumbers : ''}
+              ${settings.showAnalog ? analogFunctions.drawTicks : ''}
+
+              const hourHandColor = getAnalogColor('#333', '#e5e7eb', ${settings.invertAnalog})(isDarkMode);
+              const minHandColor = getAnalogColor('#555', '#d1d5db', ${settings.invertAnalog})(isDarkMode);
+              // 秒針の色は反転設定に関わらず赤で固定
+              const secHandColor = '#ef4444';
+
+              const hourAngle = ((h % 12) * Math.PI / 6) + (m * Math.PI / 360) + (s * Math.PI / 21600);
+              drawHand(hourAngle, radius * 0.5, radius * 0.07, hourHandColor);
+              const minAngle = (m * Math.PI / 30) + (s * Math.PI / 1800);
+              drawHand(minAngle, radius * 0.8, radius * 0.05, minHandColor);
+              const secAngle = (s * Math.PI / 30);
+              drawHand(secAngle, radius * 0.9, radius * 0.02, secHandColor);
+              ctx.restore();
+          }
+      }
+
+      function setupAnalogClock() {
+          if (!analogCanvas) return;
+          const size = analogCanvas.parentElement.clientWidth;
+          analogCanvas.width = size; analogCanvas.height = size;
+          radius = analogCanvas.height / 2 * 0.9;
+          updateClocks();
+      }
+
+      if (analogCanvas) {
+          window.addEventListener('resize', setupAnalogClock);
+          setupAnalogClock();
+      }
+      setInterval(updateClocks, 1000);
+      updateClocks();
+      if (window.matchMedia) {
+          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateClocks);
+      }
+  })();`;
+  }
+
+  function updateGenerator() {
+      const code = generateHtml();
+      controls.generatedCode.value = code;
+      controls.preview.srcdoc = code;
+  }
+
+  initialize();
+
+</script>
+</body>
+</html>
