@@ -8,6 +8,7 @@ Google Sites や WordPress に `<iframe>` で埋め込める形式の1ファイ�
 - 施設マップ: https://shigerutakano.github.io/bodik-visualizations/facility_map/
 - アメダス情報: https://shigerutakano.github.io/bodik-visualizations/amedas_weather/
 - 時計: https://shigerutakano.github.io/bodik-visualizations/clock/
+- 福岡市防災情報マップ: https://shigerutakano.github.io/bodik-visualizations/fukusyo_mail/
 
 ## 埋め込み例
 ```html
