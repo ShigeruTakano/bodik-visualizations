@@ -42,7 +42,7 @@ BODIKに登録されている自治体オープンデータを、簡単に可視
 `<iframe>` タグを使って外部サイトに読み込みます。
 ```html
 <iframe src="https://shigerutakano.github.io/bodik-visualizations/fukusyo_mail/"
-        width="800" height="600" style="border:none;"></iframe>
+        width="1024" height="600" style="border:none;"></iframe>
 ```
 ### 埋め込みHTMLジェネレータの場合（例: 施設マップ）
 1. ジェネレータページを開き、条件を設定して「埋め込みコードを生成」ボタンを押します。
